@@ -40,20 +40,20 @@ require( [
 		'jquery',
 		'react',
 		'bootstrap',
-		'jsx!resource/main',
-		'socketio'
+		'jsx!resource/main'
+		//'socketio'
 	], 
 	function($, React, Bootstrap, Home, io) {
 		var app = window.app = {};
 		window.React = React;
-		var socket = window.socket = io.connect( '/' );
+		//var socket = window.socket = io.connect( '/' );
 		$( function() { 
 			Home();
-			socket.on( 'connect', function() {
-				socket.on( 'server.connected', function( message ) {
-					socket.emit( 'client.identity', { id: message.user } );	
-				} );
-			} );
+			// socket.on( 'connect', function() {
+			// 	socket.on( 'server.connected', function( message ) {
+			// 		socket.emit( 'client.identity', { id: message.user } );	
+			// 	} );
+			// } );
 		});
 	}
 );
