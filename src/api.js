@@ -6,7 +6,8 @@ var _ = require( 'lodash' ),
 	gaze = require( 'gaze' ),
 	readDirectory = nodeWhen.lift( fs.readdir ),
 	adapters = [],
-	authorizer,
+	actionList,
+	host,
 	fount;
 
 function addAdapter( adapter ) {
@@ -34,11 +35,17 @@ function getResources( filePath ) {
 	}
 }
 
+function getActions( resource ) {
+	_.each( resource.actions, function( action ) {
+		actionList.push( { resource: resource.name, name: action.alias } );
+	} );
+}
+
 function loadModule( resourcePath ) {
 	try {
 		var key = path.resolve( resourcePath );
 		delete require.cache[ key ];
-		var mod = require( resourcePath )( fount );
+		var mod = require( resourcePath )( host );
 		if( mod && mod.name ) {
 			return processResource( mod, path.dirname( resourcePath ) );
 		} else {
@@ -68,35 +75,50 @@ function loadSelf() {
 }
 
 function processResource( resource, basePath ) {
+	getActions( resource );
 	return when.all( _.map( adapters, function( adapter ) {
 		return when.try( adapter.resource, resource, basePath )
 	} ) )
-	.then( function() {
-		return _.map( resource.actions, function( action ) {
-			return { 
-				name: [ resource.name, action.alias ].join( '.' ), 
-				resource: resource.name 
-			};
-		} );
+	.then( function( meta ) {
+		var container = {};
+		container[ resource.name ] = _.reduce( meta, reduce, {} );
+		return container;
 	} );
 }
 
-function start( resourcePath ) {
+function reduce( acc, resource ) {
+	_.each( resource, function( val, key ) {
+		if( acc[ key ] ) {
+			_.each( val, function( list, prop ) {
+				acc[ key ][ prop ] = list;
+			} );
+		} else {
+			acc[ key ] = val;
+		}
+	} );
+	return acc;
+}
+
+function start( resourcePath, auth ) {
+	actionList = [];
 	return when.all( [
 			loadResources( resourcePath ),
-			processResource( require( './_autohost/resource.js' )( fount ), path.resolve( __dirname, './_autohost' ) )
+			processResource( require( './_autohost/resource.js' )( host, fount ), path.resolve( __dirname, './_autohost' ) )
 		] )
 		.then( function ( list ) {
-			var actions = _.flatten( list );
-			if( authorizer ) {
-				authorizer.actionList( actions )
+			if( auth ) {
+				auth.authorizer.actionList( actionList )
+					.then( null, function( err ) {
+						console.log( err, err.stack );
+					} )
 					.then( function() {
 						startAdapters();
 					} );
 			} else {
 				startAdapters();
 			}
-			return actions;
+			var flattened = _.reduce( _.flatten( list ), reduce, {} );
+			return flattened;
 		} );
 }
 
@@ -117,7 +139,8 @@ function watch( filePath ) {
 	} );
 }
 
-module.exports = function() {
+module.exports = function( ah ) {
+	host = ah;
 	return {
 		addAdapter: addAdapter,
 		clearAdapters: clearAdapters,

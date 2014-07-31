@@ -11,7 +11,7 @@ var should = require( 'should' ),
 	actionRoles = {
 
 	},
-	http = require( '../src/express/http.js' )( config, requestor, metrics ),
+	http = require( '../src/http/http.js' )( config, requestor, metrics ),
 	authProvider = {
 		checkPermission: function( user, action ) {
 			var requiredRoles = actionRoles[ action ];
@@ -22,7 +22,7 @@ var should = require( 'should' ),
 	addRoles = function( action, roles ) {
 		actionRoles[ action ] = roles;
 	},
-	httpAdapter = require( '../src/express/adapter.js' )( config, authProvider, http, metrics );
+	httpAdapter = require( '../src/http/adapter.js' )( config, authProvider, http, metrics );
 
 describe( 'with http module', function() {
 	var middlewareHit = [],

@@ -7,7 +7,7 @@ var should = require( 'should' ),
 	config = {
 		port: port
 	},
-	http = require( '../src/express/http.js' )( config, requestor, metrics );
+	http = require( '../src/http/http.js' )( config, requestor, metrics );
 
 describe( 'with http module', function() {
 	var middlewareHit = [],
