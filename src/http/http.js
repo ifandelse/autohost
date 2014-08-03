@@ -75,6 +75,7 @@ function start( authStrategy ) {
 }
 
 function stop() {
+	app._router = undefined;
 	wrapper.server.close();
 }
 

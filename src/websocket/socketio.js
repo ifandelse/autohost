@@ -33,7 +33,14 @@ function acceptSocket( socket ) {
 
 	// normalize socket publishing interface
 	socket.publish = function( topic, message ) {
-		socket.json.send( { topic: topic, body: message } );
+		socket.emit( topic, message );
+	};
+
+	// add a way to close a socket
+	socket.close = function() {
+		socket.removeAllListeners();
+		socket.disconnect( true );
+		registry.remove( socket ); 
 	};
 
 	// if client identifies itself, register id
@@ -48,12 +55,15 @@ function acceptSocket( socket ) {
 	// subscribe to registered topics
 	_.each( registry.topics, function( callback, topic ) {
 		if( callback ) {
-			socket.on( topic, function( data ) { callback( data, socket ); } );
+			socket.on( topic, function( data ) {
+				callback( data, socket ); 
+			} );
 		}
 	} );
 
 	socket.publish( 'server.connected', { user: socket.user } );
 	socket.on( 'disconnect', function() { 
+		socket.removeAllListeners();
 		registry.remove( socket ); 
 	} );
 }
@@ -67,19 +77,13 @@ function authSocketIO( socket, callback ) {
 							callback();
 						},
 			failure	= 	function( status, challenge ) {
-							var reject;
-							if( status == 400 ) {
-								reject = new Error( { status: status, reason: 'Invalid credentials' } );
-							} else {
-								reject = new Error( { status: 401, reason: 'Authentication Required' } );
-							}
-							callback( reject );
+							callback( new Error( '401 - Authentication Required') );
 						};
 			strategy = authStrategy.getSocketAuth( success, failure );
 		strategy.authenticate( handshake );
 	} else {
 		handshake.user = 'anonymous';
-		callback( null, true );
+		callback();
 	}
 }
 
@@ -89,11 +93,24 @@ function configureSocketIO( http ) {
 	io.on( 'connection', acceptSocket );
 }
 
+function handle( topic, callback ) {
+	_.each( registry.clients, function( client ) {
+		client.on( topic, function( data ) { callback( data, client ); } );
+	} );
+}
+
+function stop() {
+	io.engine.removeAllListeners();
+	io.engine.close();
+}
+
 module.exports = function( cfg, reg, auth ) {
 	config = cfg;
 	authStrategy = auth;
 	registry = reg;
 	return {
-		config: configureSocketIO
+		config: configureSocketIO,
+		on: handle,
+		stop: stop
 	}
 };

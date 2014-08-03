@@ -8,7 +8,8 @@ var path = require( 'path' ),
 	httpAdapterFn = require( './http/adapter.js' ),
 	socketFn = require( './websocket/socket.js' ),
 	socketAdapterFn = require( './websocket/adapter.js' ),
-	 wrapper = {
+	wrapper = {
+	 	actions: undefined,
 	 	auth: undefined,
 		config: undefined,
 		init: initialize,

@@ -7,20 +7,19 @@ var should = require( 'should' ),
 	config = {
 		port: port
 	},
-	http = require( '../src/http/http.js' )( config, requestor, metrics );
+	http = require( '../src/http/http.js' )( config, requestor, {}, metrics );
 
 describe( 'with http module', function() {
 	var middlewareHit = [],
 		request,
 		statusCode = 200,
-		response;
-
-	var cleanup = function() {
-		middlewareHit = [];
-		request = undefined;
-		response = undefined;
-		statusCode = 200;
-	};
+		response,
+		cleanup = function() {
+			middlewareHit = [];
+			request = undefined;
+			response = undefined;
+			statusCode = 200;
+		};
 
 	before( function() {
 		http.middleware( '/', function( req, res, next ) {
@@ -38,7 +37,7 @@ describe( 'with http module', function() {
 		http.static( '/files', path.join( __dirname, './public' ) );
 		http.route( '/thing/:one/:two', 'all', function( req, res ) {
 			request = req;
-			res.status(  statusCode ).send( response );
+			res.status( statusCode ).send( response );
 		} );
 		http.start();
 	} );

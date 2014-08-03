@@ -24,9 +24,7 @@ function addPassport( http ) {
 	_.each( anonPaths, function( pattern ) {
 		http.route( pattern, 'all', skipAuthentication );
 	} );
-	// http.route( '*', 'all', whenNoUsers );
-	// http.route( '*', 'all', skipConditionally );
-	// http.route( '*', 'all', getRoles );
+	
 	http.middleware( '/', whenNoUsers );
 	http.middleware( '/', skipConditionally );
 	http.middleware( '/', getRoles );

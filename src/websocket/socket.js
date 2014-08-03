@@ -1,16 +1,18 @@
-var clients = [],
-	config, socketIO, websocket, http;
-var wrapper = {
-	add: addClient,
-	clients: clients,
-	identified: socketIdentified,
-	notify: notifyClients,
-	on: onTopic,
-	remove: removeClient,
-	send: sendToClient,
-	start: start,
-	topics: {}
-};
+var _ = require( 'lodash' ),
+	clients = [],
+	config, socketIO, websocket, http,
+	wrapper = {
+		add: addClient,
+		clients: clients,
+		identified: socketIdentified,
+		notify: notifyClients,
+		on: onTopic,
+		remove: removeClient,
+		send: sendToClient,
+		start: start,
+		stop: stop,
+		topics: {}
+	};
 
 wrapper.clients.lookup = {};
 
@@ -30,6 +32,9 @@ function notifyClients( message, data ) {
 
 function onTopic( topic, handle ) {
 	wrapper.topics[ topic ] = handle;
+	if( socketIO ) {
+		socketIO.on( topic, handle );
+	}
 }
 
 function removeClient( socket ) {
@@ -64,6 +69,21 @@ function start( authStrategy ) {
 	if( config.websocket ) {
 		websocket = require( './websocket' )( config, wrapper, authStrategy );
 		websocket.config( http );
+	}
+}
+
+function stop() {
+	_.each( wrapper.clients, function( socket ) {
+		if( socket ) {
+			socket.removeAllListeners();
+			socket.close();
+		}
+	} );
+	if( socketIO ) {
+		socketIO.stop();
+	}
+	if( websocket ) {
+		websocket.stop();
 	}
 }
 

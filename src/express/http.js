@@ -24,7 +24,6 @@ function initialize( authStrategy ) {
 	var cwd = process.cwd(),
 		public = path.resolve( cwd, ( config.static || './public' ) );
 	config.tmp = path.resolve( cwd, ( config.temp || './tmp' ) );
-	console.log( public, __filename, __dirname );
 
 	registerStaticPath( '/', public );
 

@@ -11,36 +11,27 @@ var should = require( 'should' ),
 	actionRoles = {
 
 	},
-	http = require( '../src/http/http.js' )( config, requestor, metrics ),
 	authProvider = {
-		checkPermission: function( user, action ) {
-			var requiredRoles = actionRoles[ action ];
-			var authd = requiredRoles.length == 0 || _.intersection( requiredRoles, user.roles ).length > 0;
-			return when( authd );
+		authorizer: {
+			checkPermission: function( user, action ) {
+				var requiredRoles = actionRoles[ action ],
+					authorized = requiredRoles.length === 0 || _.intersection( requiredRoles, user.roles ).length > 0;
+				return when( authorized );
+			}
 		}
 	},
+	http = require( '../src/http/http.js' )( config, requestor, authProvider, metrics ),
 	addRoles = function( action, roles ) {
 		actionRoles[ action ] = roles;
 	},
-	httpAdapter = require( '../src/http/adapter.js' )( config, authProvider, http, metrics );
+	httpAdapter = require( '../src/http/adapter.js' )( config, authProvider, http, requestor, metrics );
 
 describe( 'with http module', function() {
-	var middlewareHit = [],
-		request,
-		statusCode = 200,
-		response,
-		envelope,
-		userRoles = [];
-
-	var cleanup = function() {
-		middlewareHit = [];
-		request = undefined;
-		response = undefined;
-		envelope = undefined;
-		statusCode = 200;
-		userRoles = [];
-		actionRoles = {};
-	};
+	var userRoles = [],
+		cleanup = function() {
+			userRoles = [];
+			actionRoles = {};
+		};
 
 	before( function() {
 		http.middleware( '/', function( req, res, next ) {
@@ -82,7 +73,7 @@ describe( 'with http module', function() {
 		after( cleanup );
 	} );
 
-	describe( 'when making a request with adequate permissions', function() {
+	describe( 'when making a request with inadequate permissions', function() {
 		var result;
 
 		before( function( done ) {

@@ -5,8 +5,14 @@ var _ = require( 'lodash' ),
 	fs = require( 'fs' ),
 	gaze = require( 'gaze' ),
 	readDirectory = nodeWhen.lift( fs.readdir ),
+	wrapper = {
+		actionList: {},
+		addAdapter: addAdapter,
+		clearAdapters: clearAdapters,
+		loadResources: loadResources,
+		start: start
+	},
 	adapters = [],
-	actionList,
 	host,
 	fount;
 
@@ -36,8 +42,9 @@ function getResources( filePath ) {
 }
 
 function getActions( resource ) {
+	var list = wrapper.actionList[ resource.name ] = [];
 	_.each( resource.actions, function( action ) {
-		actionList.push( { resource: resource.name, name: action.alias } );
+		list.push( [ resource.name, action.alias ].join( '.' ) );
 	} );
 }
 
@@ -100,17 +107,15 @@ function reduce( acc, resource ) {
 }
 
 function start( resourcePath, auth ) {
-	actionList = [];
+	wrapper.actionList = {};
 	return when.all( [
 			loadResources( resourcePath ),
 			processResource( require( './_autohost/resource.js' )( host, fount ), path.resolve( __dirname, './_autohost' ) )
 		] )
 		.then( function ( list ) {
+			host.actions = wrapper.actionList;
 			if( auth ) {
-				auth.authorizer.actionList( actionList )
-					.then( null, function( err ) {
-						console.log( err, err.stack );
-					} )
+				auth.authorizer.actionList( wrapper.actionList )
 					.then( function() {
 						startAdapters();
 					} );
@@ -141,10 +146,5 @@ function watch( filePath ) {
 
 module.exports = function( ah ) {
 	host = ah;
-	return {
-		addAdapter: addAdapter,
-		clearAdapters: clearAdapters,
-		loadResources: loadResources,
-		start: start
-	}
+	return wrapper;
 };

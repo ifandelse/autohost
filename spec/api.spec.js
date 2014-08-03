@@ -25,10 +25,11 @@ var getAdapter = function() {
 describe( 'when loading from a bad path', function() {
 	var result,
 		api,
+		host = { actions: undefined },
 		adapter = getAdapter();
 
 	before( function( done ) {
-		api = require( '../src/api.js' )( fount );
+		api = require( '../src/api.js' )( host, fount );
 		api.addAdapter( adapter );
 		api.start( './spec/durp' )
 			.then( null, function( err ) {
@@ -65,6 +66,33 @@ describe( 'when loading from a bad path', function() {
 		} );
 	} );
 
+	it( 'should produce correctly formatted action list', function() {
+		api.actionList.should.eql( 
+		{ _autohost: [
+			'_autohost.api',
+			'_autohost.resources',
+			'_autohost.actions',
+			'_autohost.connected-sockets',
+			'_autohost.list-users',
+			'_autohost.list-roles',
+			'_autohost.list-user-roles',
+			'_autohost.list-action-roles',
+			'_autohost.set-action-roles',
+			'_autohost.add-action-roles',
+			'_autohost.remove-action-roles',
+			'_autohost.set-user-roles',
+			'_autohost.add-user-roles',
+			'_autohost.remove-user-roles',
+			'_autohost.add-role',
+			'_autohost.remove-role',
+			'_autohost.create-user',
+			'_autohost.enable-user',
+			'_autohost.disable-user',
+			'_autohost.metrics'
+			]
+		} );
+	} );
+
 	after( function() {
 		api.clearAdapters();
 	} );
@@ -73,10 +101,11 @@ describe( 'when loading from a bad path', function() {
 describe( 'when loading from a good path', function() {
 	var result,
 		api,
+		host = { actions: undefined },
 		adapter = getAdapter();
 
 	before( function( done ) {
-		api = require( '../src/api.js' )( fount );
+		api = require( '../src/api.js' )( host, fount );
 		api.addAdapter( adapter );
 		api.start( './spec/resources' )
 			.then( null, function( err ) {
@@ -120,6 +149,35 @@ describe( 'when loading from a good path', function() {
 			'enable-user': { verb: 'put', url: undefined },
 			'disable-user': { verb: 'delete', url: undefined },
 			metrics: { verb: 'get', url: undefined } 
+		} );
+	} );
+
+	it( 'should produce correctly formatted action list', function() {
+		api.actionList.should.eql( 
+		{ _autohost: [
+			'_autohost.api',
+			'_autohost.resources',
+			'_autohost.actions',
+			'_autohost.connected-sockets',
+			'_autohost.list-users',
+			'_autohost.list-roles',
+			'_autohost.list-user-roles',
+			'_autohost.list-action-roles',
+			'_autohost.set-action-roles',
+			'_autohost.add-action-roles',
+			'_autohost.remove-action-roles',
+			'_autohost.set-user-roles',
+			'_autohost.add-user-roles',
+			'_autohost.remove-user-roles',
+			'_autohost.add-role',
+			'_autohost.remove-role',
+			'_autohost.create-user',
+			'_autohost.enable-user',
+			'_autohost.disable-user',
+			'_autohost.metrics'
+			],
+			one: [ 'one.a', 'one.b' ],
+			two: [ 'two.a', 'two.b' ] 
 		} );
 	} );
 

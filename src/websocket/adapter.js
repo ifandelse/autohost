@@ -21,7 +21,7 @@ function buildActionTopic( resourceName, action ) {
 }
 
 function checkPermissionFor( user, action ) {
-	return authStrategy.checkPermission( user, action )
+	return authStrategy.authorizer.checkPermission( user, action )
 		.then( null, function() {
 			return true;
 		} )
@@ -34,7 +34,7 @@ function start() {
 	socket.start( authStrategy );
 }
 
-function wireupResource( resource, basePath ) {
+function wireupResource( resource ) {
 	var meta = { topics: {} };
 	_.each( resource.actions, function( action ) {
 		wireupAction( resource, action, meta );
@@ -48,17 +48,18 @@ function wireupAction( resource, action, meta ) {
 
 	meta.topics[ action.alias ] = { topic: topic };
 	socket.on( topic, function( message, socket ) {
+		var data = message.data || message;
 		var respond = function() {
-			var envelope = new SocketEnvelope( message, socket );
+			var envelope = new SocketEnvelope( topic, message, socket );
 			action.handle.apply( resource, [ envelope ] );
 		};
 		if( authStrategy ) {
-			checkPermissionFor( req.user, alias )
+			checkPermissionFor( socket.user, alias )
 				.then( function( pass ) {
 					if( pass ) {
 						respond();
 					} else {
-						socket.publish( { topic: 'unauthorized', message: 'user lacks sufficient permission' } );
+						socket.publish( data.replyTo || topic, 'User lacks sufficient permission' );
 					}
 				} );
 		} else {

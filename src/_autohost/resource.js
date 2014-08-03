@@ -48,7 +48,8 @@ module.exports = function( host, fount ) {
 					// 			envelope.reply( { data: list } );
 					// 		} );
 					// } else {
-						envelope.reply( { data: host.actions } );
+					console.log( host );
+					envelope.reply( { data: host.actions } );
 					// }
 				}
 			},

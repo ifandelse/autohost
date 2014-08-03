@@ -1,32 +1,18 @@
 var SocketStream = require( './socketStream.js' );
 
-function SocketEnvelope( message, socket ) {
+function SocketEnvelope( topic, message, socket ) {
 	this.transport = 'websocket';
 	this.context = socket.context;
 	this.data = message.data || message || {};
 	this.cookies = socket.cookies;
 	this.headers = socket.headers;
 	this.user = socket.user;
-	this.responseStream = new SocketStream( message.replyTo, socket );
+	this.replyTo = this.data.replyTo || topic;
+	this.responseStream = new SocketStream( this.replyTo, socket );
 	this._original = {
 		message: message,
 		socket: socket
 	};
-
-	for( var key in req.params ) {
-		var val = req.params[ key ];
-		if( !this.data[ key ] ) {
-			this.data[ key ] = val;
-		}
-		this.params[ key ] = val;
-	}
-	for( var key in req.query ) {
-		var val = req.query[ key ];
-		if( !this.data[ key ] ) {
-			this.data[ key ] = val;
-		}
-		this.params[ key ] = val;
-	}
 }
 
 SocketEnvelope.prototype.forwardTo = function( options ) {
@@ -34,7 +20,11 @@ SocketEnvelope.prototype.forwardTo = function( options ) {
 };
 
 SocketEnvelope.prototype.reply = function( envelope ) {
-	this._original.socket.publish( message.replyTo, envelope );
+	if( this._original.message.data ) {
+		this._original.socket.publish( this.replyTo, envelope );
+	} else {
+		this._original.socket.publish( this.replyTo, envelope.data );
+	}
 }
 
 SocketEnvelope.prototype.replyWithFile = function( contentType, fileName, fileStream ) {
