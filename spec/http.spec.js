@@ -1,13 +1,16 @@
 var should = require( 'should' ),
 	path = require( 'path' ),
 	_ = require( 'lodash' ),
-	requestor = require( 'request' ).defaults( { jar: true } ),
+	requestor = require( 'request' ).defaults( { jar: false } ),
 	metrics = require( 'cluster-metrics' ),
 	port = 88988,
 	config = {
 		port: port
 	},
-	http = require( '../src/http/http.js' )( config, requestor, {}, metrics );
+	authProvider = require( './auth/mock.js' )( config ),
+	passport = require( '../src/http/passport.js' )( config, authProvider, metrics ),
+	middleware = require( '../src/http/middleware.js' )( config, metrics ),
+	http = require( '../src/http/http.js' )( config, requestor, passport, middleware, metrics );
 
 describe( 'with http module', function() {
 	var middlewareHit = [],
@@ -22,6 +25,9 @@ describe( 'with http module', function() {
 		};
 
 	before( function() {
+		authProvider.users = {};
+		passport.resetUserCheck();
+
 		http.middleware( '/', function( req, res, next ) {
 			middlewareHit.push( 1 );
 			next();
@@ -39,7 +45,7 @@ describe( 'with http module', function() {
 			request = req;
 			res.status( statusCode ).send( response );
 		} );
-		http.start();
+		http.start( authProvider );
 	} );
 
 	describe( 'when getting a static file', function() {
@@ -94,7 +100,7 @@ describe( 'with http module', function() {
 		before( function( done ) {
 			response = 'hey, a thing';
 			requestor.get( {
-				url: 'http://localhost:88988/thing/a/b' 
+				url: 'http://localhost:88988/thing/a/b?c=3' 
 			}, function( err, resp ) {
 				result = resp;
 				done();
@@ -108,6 +114,7 @@ describe( 'with http module', function() {
 		it( 'should have parameters available', function() {
 			request.params.one.should.equal( 'a' );
 			request.params.two.should.equal( 'b' );
+			request.query.c.should.equal( '3' );
 		} );
 
 		it( 'should execute all middleware in order', function() {

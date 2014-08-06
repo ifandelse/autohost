@@ -21,7 +21,7 @@ function buildActionTopic( resourceName, action ) {
 }
 
 function checkPermissionFor( user, action ) {
-	return authStrategy.authorizer.checkPermission( user, action )
+	return authStrategy.checkPermission( user.name, action )
 		.then( null, function() {
 			return true;
 		} )

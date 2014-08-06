@@ -1,9 +1,11 @@
 var _ = require( 'lodash' ),
 	socketio = require( 'socket.io' ),
+	passportIo = require( 'passport.socketio' ),
 	authStrategy,
 	registry,
 	config,
-	io;
+	io,
+	middleware;
 
 function acceptSocket( socket ) {
 	var handshake = socket.handshake;
@@ -68,28 +70,26 @@ function acceptSocket( socket ) {
 	} );
 }
 
-function authSocketIO( socket, callback ) {
-	var handshake = socket.request;
-	if( authStrategy ) {
-		var success = 	function( user, id ) {
-							handshake.user = user;
-							handshake.id = id;
-							callback();
-						},
-			failure	= 	function( status, challenge ) {
-							callback( new Error( '401 - Authentication Required') );
-						};
-			strategy = authStrategy.getSocketAuth( success, failure );
-		strategy.authenticate( handshake );
-	} else {
-		handshake.user = 'anonymous';
-		callback();
-	}
+function authSocketIO( req, allow ) {
+	var allowed;
+	middleware
+		.use( '/', function( hreq, hres, next ) {
+			allowed = hreq.user;
+			next();
+		} )
+		.handle( req, req.res, function( err ) {
+			if( err ) {
+				allow( err );
+			} else {
+				allow( null, allowed );
+			}
+		} );
 }
 
 function configureSocketIO( http ) {
 	io = socketio( http.server );
-	io.use( authSocketIO );
+	middleware = http.getAuthMiddleware();
+	io.engine.allowRequest = authSocketIO;
 	io.on( 'connection', acceptSocket );
 }
 

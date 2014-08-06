@@ -1,22 +1,24 @@
 var _ = require( 'lodash' ),
 	WS = require ( 'websocket' ).server,
+	ServerResponse = require( 'http' ).ServerResponse,
 	authStrategy,
 	registry,
 	socketServer,
+	middleware,
 	config;
 
 function allowOrigin( origin ) {
 	return ( config.origin && origin === config.origin ) || !config.origin;
 }
 
-function acceptSocketRequest( user, id, request ) {
+function acceptSocketRequest( request ) {
 	var protocol = request.requestedProtocols[ 0 ],
 		socket = request.accept( protocol, request.origin );
 	
 	// grab user from request
 	socket.user = {
-		id: id || user || 'anonymous',
-		name: user || 'anonymous' 
+		id: request.user.name,
+		name: request.httpRequest.user.name 
 	};
 
 	// grab cookies parsed from middleware
@@ -75,6 +77,7 @@ function acceptSocketRequest( user, id, request ) {
 
 function configureWebsocket( http ) {
 	if( config.websockets || config.websocket ) {
+		middleware = http.getAuthMiddleware();
 		socketServer = new WS( { 
 			httpServer: http.server,
 			autoAcceptConnections: false 
@@ -94,23 +97,19 @@ function handleWebSocketRequest( request ) {
 		request.reject();
 		return;
 	}
-	
-	if( authStrategy ) {
-		var success = 	function( user, id ) {
-							acceptSocketRequest( user, id, request );
-						},
-			failure	= 	function( status ) {
-							if( status == 400 ) {
-								request.reject( status, 'Invalid credentials' );
-							} else {
-								request.reject( 401, 'Authentication Required', { 'WWW-Authenticate': status } );
-							}
-						},
-			strategy = authStrategy.getSocketAuth( success, failure );
-		strategy.authenticate( request.httpRequest );
-	} else {
-		acceptSocketRequest( 'anonymous', 'anonymous', request );
-	}
+
+	var allowed,
+		response = new ServerResponse( request.httpRequest );
+	response.assignSocket( request.socket );
+	middleware
+		.handle( request.httpRequest, response, function( err ) {
+			if( err || !request.httpRequest.user ) {
+				request.reject( 401, 'Authentication Required', { 'WWW-Authenticate': 'Basic' } );
+			} else {
+				request.user = request.httpRequest.user;
+				acceptSocketRequest( request );
+			}
+		} );
 }
 
 function stop() {

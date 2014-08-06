@@ -1,24 +1,62 @@
 var path = require( 'path' ),
 	_ = require( 'lodash' ),
+	parseUrl = require( 'parseurl' ),
+	qs = require( 'qs' ),
 	express = require( 'express' ),
 	http = require( 'http' ),
-	request,
-	app, 
+	Router = express.Router,
+	expreq = express.request,
+	expres = express.response,
+	queryparse = qs.parse,
+	request, 
 	config, 
 	metrics,
-	passport,
+	middlewareLib,
 	middleware = [],
 	routes = []
 	paths = [];
 
 var wrapper = {
+	getMiddleware: createMiddlewareStack,
+	getAuthMiddleware: createAuthMiddlewareStack,
 	middleware: registerMiddleware,
 	route: registerRoute,
 	start: start,
 	static: registerStaticPath,
 	server: undefined,
+	app: undefined,
+	passport: undefined,
 	stop: stop
 };
+
+function createMiddlewareStack() {
+	var router = new Router();
+	router
+		.use( expressInit )
+		.use( queryParser );
+	_.each( middleware, function( m ) {
+		m( router );
+	} );
+	return router;
+}
+
+function createAuthMiddlewareStack() {
+	var router = new Router().use( expressInit );
+	_.each( wrapper.passport.getMiddleware( '/' ), function( m ) {
+		router.use( m.path, m.fn );
+	} );
+	return router;
+}
+
+function expressInit( req, res, next ) {
+    // req.res = res;
+    // res.req = req;
+    req.next = next;
+    req.__proto__ = expreq;
+    res.__proto__ = expres;
+    // res.locals = res.locals || Object.create(null);
+    next();
+}
 
 function initialize( authStrategy ) {
 	var cwd = process.cwd(),
@@ -28,21 +66,29 @@ function initialize( authStrategy ) {
 	registerStaticPath( '/', public );
 
 	// prime middleware with defaults
-	require( './middleware' )( express, registerMiddleware, config, metrics );
+	middlewareLib.attach( registerMiddleware );
 
-	if( authStrategy ) {
-		passport.wireupPassport( wrapper );
-	}
+	// if( authStrategy ) {
+	wrapper.passport.wireupPassport( wrapper );
+	//}
 
 	// apply user-supplied middleware
-	_.each( middleware, function( m ) { m(); } );
+	_.each( middleware, function( m ) { m( wrapper.app ); } );
 	_.each( routes, function( r ) { r(); } );
 	_.each( paths, function( p ) { p(); } );
 }
 
+function queryParser( req, res, next ) {
+	if ( !req.query ) {
+		var val = parseUrl( req ).query;
+		req.query = queryparse( val );
+	}
+	next();
+}
+
 function registerMiddleware( filter, callback ) {
-	middleware.push( function() {
-		app.use( filter, callback );
+	middleware.push( function( target ) {
+		target.use( filter, callback );
 	} );
 }
 
@@ -51,7 +97,7 @@ function registerRoute( url, verb, callback ) {
 	verb = verb == 'all' || verb == 'any' ? 'all' : verb;
 	var errors = [ url, verb, 'errors' ].join( '.' );
 	routes.push( function() {
-		app[ verb ]( url, function( req, res ) {
+		wrapper.app[ verb ]( url, function( req, res ) {
 			try {
 				callback( req, res );
 			} catch ( err ) {
@@ -64,26 +110,28 @@ function registerRoute( url, verb, callback ) {
 
 function registerStaticPath( url, filePath ) {
 	paths.push( function() {
-		app.use( url, express[ 'static' ]( path.resolve( filePath ) ) );
+		wrapper.app.use( url, express[ 'static' ]( path.resolve( filePath ) ) );
 	} );
 }
 
 function start( authStrategy ) {
 	initialize( authStrategy );
-	wrapper.server = http.createServer( app ).listen( config.port || 8800 );
+	wrapper.server = http.createServer( wrapper.app );
+	wrapper.server.listen( config.port || 8800 );
 	console.log( 'autohost listening on port ', ( config.port || 8800 ) );
 }
 
 function stop() {
-	app._router = undefined;
+	wrapper.app._router = undefined;
 	wrapper.server.close();
 }
 
-module.exports = function( cfg, req, pass, metric ) {
+module.exports = function( cfg, req, pass, mw, metric ) {
 	config = cfg;
 	metrics = metric;
 	request = req;
-	passport = pass;
-	app = express();
+	wrapper.passport = pass;
+	wrapper.app = express();
+	middlewareLib = mw;
 	return wrapper;
 };

@@ -5,7 +5,6 @@ var path = require( 'path' ),
 	passportFn = require( './http/passport.js' ),
 	httpFn = require( './http/http.js' ),
 	httpAdapterFn = require( './http/adapter.js' ),
-	httpAdapterFn = require( './http/adapter.js' ),
 	socketFn = require( './websocket/socket.js' ),
 	socketAdapterFn = require( './websocket/adapter.js' ),
 	wrapper = {
@@ -20,7 +19,7 @@ var path = require( 'path' ),
 		socket: undefined
 	},
 	api = require( './api.js' )( wrapper ),
-	passport, httpAdapter, socketAdapter;
+	passport, httpAdapter, socketAdapter, middleware;
 
 function initialize( cfg, authProvider ) {
 	wrapper.config = cfg;
@@ -58,7 +57,7 @@ function setup( authProvider ) {
 	} );
 	
 	wrapper.socket = socketFn( config, wrapper.http );
-	socketAdapter = socketAdapterFn( config, passport, wrapper.socket, metrics );
+	socketAdapter = socketAdapterFn( config, passport, metrics );
 	api.addAdapter( socketAdapter );
 
 	api.start( config.resources || path.join( process.cwd(), './resources' ), authProvider )

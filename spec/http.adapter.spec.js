@@ -8,32 +8,27 @@ var should = require( 'should' ),
 	config = {
 		port: port
 	},
-	actionRoles = {
+	authProvider = require( './auth/mock.js' )( config ),
+	passport = require( '../src/http/passport.js' )( config, authProvider, metrics ),
+	middleware = require( '../src/http/middleware.js' )( config, metrics ),
+	http = require( '../src/http/http.js' )( config, requestor, passport, middleware, metrics );
+	httpAdapter = require( '../src/http/adapter.js' )( config, authProvider, http, requestor, metrics ),
+	actionRoles = function( action, roles ) {
+		authProvider.actions[ action ] = { roles: roles };
+	},
+	userRoles = function( user, roles ) {
+		authProvider.users[ user ].roles = roles;
+	};
 
-	},
-	authProvider = {
-		authorizer: {
-			checkPermission: function( user, action ) {
-				var requiredRoles = actionRoles[ action ],
-					authorized = requiredRoles.length === 0 || _.intersection( requiredRoles, user.roles ).length > 0;
-				return when( authorized );
-			}
-		}
-	},
-	http = require( '../src/http/http.js' )( config, requestor, authProvider, metrics ),
-	addRoles = function( action, roles ) {
-		actionRoles[ action ] = roles;
-	},
-	httpAdapter = require( '../src/http/adapter.js' )( config, authProvider, http, requestor, metrics );
-
-describe( 'with http module', function() {
-	var userRoles = [],
-		cleanup = function() {
-			userRoles = [];
-			actionRoles = {};
+describe( 'with http adapter', function() {
+	var cleanup = function() {
+			userRoles( 'userman', [] );
+			actionRoles( 'test.call', [] );
 		};
 
 	before( function() {
+		authProvider.tokens = { 'blorp': 'userman' };
+		authProvider.users = { 'userman': { name: 'userman', password: 'hi', roles: [] } };
 		http.middleware( '/', function( req, res, next ) {
 			req.user = {
 				roles: userRoles
@@ -52,47 +47,50 @@ describe( 'with http module', function() {
 		http.start();
 	} );
 
-	describe( 'when making a request with adequate permissions', function() {
-		var result;
-
-		before( function( done ) {
-			addRoles( 'test.call', [ 'guest' ] );
-			userRoles = [ 'guest' ];
-			requestor.get( {
-				url: 'http://localhost:88988/api/test/call/10/20' 
-			}, function( err, resp ) {
-				result = resp.body;
-				done();
-			} );
-		} );
-
-		it( 'should return file contents', function() {
-			result.should.equal( 'ta-da!' );
-		} );
-
-		after( cleanup );
-	} );
-
 	describe( 'when making a request with inadequate permissions', function() {
 		var result;
 
 		before( function( done ) {
-			addRoles( 'test.call', [ 'admin' ] );
-			userRoles = [ 'guest' ];
+			actionRoles( 'test.call', [ 'admin' ] );
+			userRoles( 'userman', [ 'guest' ] );
 			requestor.get( {
-				url: 'http://localhost:88988/api/test/call/10/20' 
+				url: 'http://userman:hi@localhost:88988/api/test/call/10/20'
 			}, function( err, resp ) {
 				result = resp;
 				done();
 			} );
 		} );
 
-		it( 'should return file contents', function() {
+		it( 'should tell user to take a hike', function() {
 			result.body.should.equal( 'User lacks sufficient permissions' );
 		} );
 
-		it( 'should return correct status code', function() {
+		it( 'should return 403', function() {
 			result.statusCode.should.equal( 403 );
+		} );
+
+		after( cleanup );
+	} );
+
+	describe( 'when making a request with adequate permissions', function() {
+		var result;
+
+		before( function( done ) {
+			actionRoles( 'test.call', [ 'guest' ] );
+			userRoles( 'userman', [ 'guest' ] );
+			requestor.get( {
+				url: 'http://localhost:88988/api/test/call/10/20',
+				headers: {
+					'Authorization': 'Bearer blorp'
+				}
+			}, function( err, resp ) {
+				result = new Buffer( resp.body, 'utf-8' ).toString();
+				done();
+			} );
+		} );
+
+		it( 'should return file contents', function() {
+			result.should.equal( 'ta-da!' );
 		} );
 
 		after( cleanup );

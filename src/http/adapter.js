@@ -52,8 +52,9 @@ function buildPath( pathSpec ) {
 }
 
 function checkPermissionFor( user, action ) {
-	return authStrategy.authorizer.checkPermission( user, action )
-		.then( null, function() {
+	return authStrategy.checkPermission( user, action )
+		.then( null, function( err ) {
+			console.log( 'checking permissions caused an error', err.stack );
 			return true;
 		} )
 		.then( function( granted ) {

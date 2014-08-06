@@ -2,7 +2,7 @@ var should = require( 'should' ),
 	path = require( 'path' ),
 	_ = require( 'lodash' ),
 	when = require( 'when' ),
-	requestor = require( 'request' ).defaults( { jar: true } ),
+	requestor = require( 'request' ).defaults( { jar: false } ),
 	
 	metrics = require( 'cluster-metrics' ),
 	port = 88988,
@@ -11,49 +11,44 @@ var should = require( 'should' ),
 		socketio: true,
 		websocket: true
 	},
-	userRoles = [ 'guest' ],
-	actionRoles = {
+	authProvider = require( './auth/mock.js' )( config ),
+	passport = require( '../src/http/passport.js' )( config, authProvider, metrics ),
+	middleware = require( '../src/http/middleware.js' )( config, metrics ),
+	http = require( '../src/http/http.js' )( config, requestor, passport, middleware, metrics );
+	httpAdapter = require( '../src/http/adapter.js' )( config, authProvider, http, requestor, metrics ),
+	socket = require( '../src/websocket/socket.js' )( config, http, middleware ),
+	socketAdapter = require( '../src/websocket/adapter.js' )( config, authProvider, socket, metrics ),
+	actionRoles = function( action, roles ) {
+		authProvider.actions[ action ] = { roles: roles };
+	},
+	userRoles = function( user, roles ) {
+		authProvider.users[ user ].roles = roles;
+	};
 
-	},
-	authProvider = {
-		authorizer: {
-			checkPermission: function( user, action ) {
-				var requiredRoles = actionRoles[ action ],
-					authorized = requiredRoles.length === 0 || _.intersection( requiredRoles, user.roles ).length > 0;
-				return when( authorized );
-			}
-		},
-		getSocketAuth: function( onSuccess ) {
-			return {
-				authenticate: function() {
-					onSuccess( 'admin', 'admin' );
-				}
-			};
-		},
-		getSocketRoles: function() {
-			return when( userRoles );
-		}
-	},
-	http = require( '../src/http/http.js' )( config, requestor, authProvider, metrics ),
-	socket = require( '../src/websocket/socket.js' )( config, http ),
-	addRoles = function( action, roles ) {
-		actionRoles[ action ] = roles;
-	},
-	socketAdapter = require( '../src/websocket/adapter.js' )( config, authProvider, socket, metrics );
-
-describe( 'with socket module', function() {
-	var userRoles = [],
-		ioClient,
+describe( 'with socket adapter', function() {
+	var ioClient,
 		wsClient,
 		wsSocket,
 		cleanup = function() {
-			userRoles = [];
-			actionRoles = {};
+			userRoles( 'anonymous', [] );
+			userRoles( 'userman', [] );
+			actionRoles( 'test.call', [] );
 		};
 
 	before( function( done ) {
+		delete require.cache[ require.resolve( './socketio/invalid-auth.spec.js' ) ];
+		delete require.cache[ require.resolve( './socketio/noauth.spec.js' ) ];
+		delete require.cache[ require.resolve( 'socket.io-client' ) ];
+
+		authProvider.tokens = { 'blorp': 'userman' };
+		authProvider.users = { 
+			'userman': { name: 'userman', password: 'hi', roles: [] },
+			'anonymous': { name: 'anonymous', password: 'hi', roles: [] },
+		};
+		
 		var connected = 0,
 			check = function() {
+				console.log( '*** ONE SOCKET CONNECTION ***' );
 				if( ++connected > 1 ) {
 					done();
 				}
@@ -72,20 +67,24 @@ describe( 'with socket module', function() {
 			verb: 'get',
 			topic: 'call',
 			handle: function( env ) {
+				console.log( 'recieved', env.data.msg );
 				env.reply( { data: { youSed: env.data.msg } } );
 			}
 		}, { topics: {} } );
 		http.start();
-		socket.start( authProvider );
-		ioClient = io( 'http://localhost:88988' );
+		socket.start( passport );
+		ioClient = io( 'http://localhost:88988', { query: 'token=blorp' } );
+		ioClient.io.open( function() { console.log( 'HAY' ); } );
+		ioClient.io.reconnect();
 		ioClient.once( 'connect', check );
 
 		wsClient = new WebSocketClient();
 		wsClient.connect(
 			'http://localhost:88988/websocket',
-			'echo-protocol', 
-			'console', 
-			{ 'Authentication': 'Basic YWRtaW46YWRtaW4=' }
+			'echo-protocol',
+			'console',
+			// { 'Authorization': 'Basic dXNlcm1hbjpoaQ==' }
+			{ 'Authorization': 'Bearer blorp' }
 		);
 		wsClient.on( 'connect', function( cs ) {
 			wsSocket = cs;
@@ -97,16 +96,17 @@ describe( 'with socket module', function() {
 		var result;
 
 		before( function( done ) {
-			addRoles( 'test.call', [ 'guest' ] );
+			actionRoles( 'test.call', [ 'guest' ] );
+			userRoles( 'anonymous', [ 'guest' ] );
 			ioClient.once( 'test.call', function( env ) {
 				result = env.youSed;
 				done();
 			} );
-			ioClient.emit( 'test.call', { msg: 'hi' } );
+			ioClient.emit( 'test.call', { msg: 'hi from socket.io' } );
 		} );
 
 		it( 'should return echo', function() {
-			result.should.equal( 'hi' );
+			result.should.equal( 'hi from socket.io' );
 		} );
 
 		after( cleanup );
@@ -116,8 +116,8 @@ describe( 'with socket module', function() {
 		var result;
 
 		before( function( done ) {
-			addRoles( 'test.call', [ 'admin' ] );
-			userRoles = [ 'guest' ];
+			actionRoles( 'test.call', [ 'admin' ] );
+			userRoles( 'anonymous', [ 'guest' ] );
 			ioClient.once( 'test.call', function( env ) {
 				result = env;
 				done();
@@ -136,8 +136,8 @@ describe( 'with socket module', function() {
 		var result;
 
 		before( function( done ) {
-			addRoles( 'test.call', [ 'guest' ] );
-
+			actionRoles( 'test.call', [ 'guest' ] );
+			userRoles( 'userman', [ 'guest' ] );
 			wsSocket.once( 'message', function( msg ) {
 				var json = JSON.parse( msg.utf8Data );
 				if( json.topic === 'test.call' ) {
@@ -163,7 +163,7 @@ describe( 'with socket module', function() {
 		var result;
 
 		before( function( done ) {
-			addRoles( 'test.call', [ 'admin' ] );
+			actionRoles( 'test.call', [ 'admin' ] );
 			wsSocket.once( 'message', function( msg ) {
 				var json = JSON.parse( msg.utf8Data );
 				if( json.topic === 'test.call' ) {

@@ -1,12 +1,15 @@
 var bodyParser = require( 'body-parser' ),
-	cookieParser = require('cookie-parser'),
+	cookies = require('cookie-parser'),
 	multer = require( 'multer' ),
-	session = require( 'express-session' );
+	sessionLib = require( 'express-session' ),
+	wrapper = {
+		attach: applyMiddelware
+	},
+	config, metrics, session, cookieParser;
 
-module.exports = function( packages, middleware, config, metrics ) {
-	
+function applyMiddelware( attach ) {
 	// add a timer to track ALL requests
-	middleware( '/', function( req, res, next ) {
+	attach( '/', function( req, res, next ) {
 		req.context = {};
 		var timerKey = [ req.method.toUpperCase(), req.url, 'timer' ].join( ' ' );
 		metrics.timer( timerKey ).start();
@@ -18,35 +21,45 @@ module.exports = function( packages, middleware, config, metrics ) {
 
 	// turn on cookies unless turned off by the consumer
 	if( !config.noCookies ) {
-		middleware( '/', cookieParser() );
+		attach( '/', cookieParser );
 	}
 
 	// turn on body parser unless turned off by the consumer
 	if( !config.noBody ) {
-		middleware( '/', bodyParser.urlencoded( { extended: false } ) );
-		middleware( '/', bodyParser.json() );
-		middleware( '/', bodyParser.json( { type: 'application/vnd.api+json' } ) );
-		middleware( '/', multer( {
+		attach( '/', bodyParser.urlencoded( { extended: false } ) );
+		attach( '/', bodyParser.json() );
+		attach( '/', bodyParser.json( { type: 'application/vnd.api+json' } ) );
+		attach( '/', multer( {
 			dest: config.tmp
 		} ) );
 	}
 
 	// turn on sessions unless turned off by the consumer
 	if( !config.noSession ) {
-		middleware( '/', session( { 
-			secret: config.sessionSecret || 'authostthing',
-			saveUninitialized: true,
-			resave: true
-		} ) );
+		attach( '/', session );
 	}
 
 	// turn on cross origin unless turned off by the consumer
 	if( !config.noCrossOrigin ) {
-		middleware( '/', function( req, res, next ) {
+		attach( '/', function( req, res, next ) {
 			res.header( 'Access-Control-Allow-Origin', '*' );
 			res.header( 'Access-Control-Allow-Headers', 'X-Requested-With' );
 			next();
 		} );
 	}
+}
 
+module.exports = function( cfg, meter ) {
+	config = cfg;
+	metrics = meter;
+	cookieParser = cookies();
+	cfg.sessionStore = cfg.sessionStore || new sessionLib.MemoryStore();
+	session = sessionLib( { 
+		key: config.sessionId || 'sid',
+		secret: config.sessionSecret || 'authostthing',
+		saveUninitialized: true,
+		resave: true,
+		store: cfg.sessionStore
+	} );
+	return wrapper;
 };

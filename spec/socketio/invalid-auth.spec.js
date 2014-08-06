@@ -1,8 +1,7 @@
 var should = require( 'should' ),
 	path = require( 'path' ),
 	_ = require( 'lodash' ),
-	requestor = require( 'request' ).defaults( { jar: true } ),
-	io = require( 'socket.io-client' ),
+	requestor = require( 'request' ).defaults( { jar: false } ),
 	metrics = require( 'cluster-metrics' ),
 	when = require( 'when' ),
 	port = 88988,
@@ -11,41 +10,31 @@ var should = require( 'should' ),
 		socketio: true,
 		websocket: true
 	},
-	authProvider = {
-		authorizer: {
-			checkPermission: function() {}
-		},
-		getSocketAuth: function( onSuccess, onFail ) {
-			return {
-				authenticate: function() {
-					onFail( 400 );
-				}
-			};
-		},
-		getSocketRoles: function() {
-			return when( [] );
-		}
-	},
-	http = require( '../../src/http/http.js' )( config, requestor, authProvider, metrics ),
-	socket = require( '../../src/websocket/socket.js' )( config, http );
+	authProvider = require( '../auth/mock.js' )( config ),
+	passport = require( '../../src/http/passport.js' )( config, authProvider, metrics ),
+	middleware = require( '../../src/http/middleware.js' )( config, metrics ),
+	http = require( '../../src/http/http.js' )( config, requestor, passport, middleware, metrics ),
+	socket = require( '../../src/websocket/socket.js' )( config, http, middleware );
+
+authProvider.users[ 'test' ] = { user: 'torpald' };
 
 describe( 'with failed socket.io credentials', function() {
 	var socketErr,
 		client;
 
 	before( function( done ) {
-		failAuth = true;
 		http.start();
-		socket.start( authProvider );
+		socket.start( passport );
+		var io = require( 'socket.io-client' );
 		client = io( 'http://localhost:88988' );
-		client.once( 'error', function( data ) {
+		client.once( 'connect_error', function( data ) {
 			socketErr = data;
 			done();
 		} );
 	} );
 
 	it( 'should get a connection error', function() {
-		socketErr.should.equal( '401 - Authentication Required' );
+		socketErr.toString().should.equal( 'Error: xhr poll error' );
 	} );
 
 	it( 'should disconnect the socket', function() {
@@ -55,5 +44,6 @@ describe( 'with failed socket.io credentials', function() {
 	after( function() {
 		socket.stop();
 		http.stop();
+		delete require.cache[ require.resolve( 'socket.io-client' ) ];
 	} );
 } );

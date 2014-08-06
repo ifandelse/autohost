@@ -33,24 +33,23 @@ module.exports = function( host, fount ) {
 				topic: 'actions.list',
 				path: 'action',
 				handle: function( envelope ) {
-					// if( host.auth && host.auth.getActionList ) {
-					// 	var pageSize = 20;
-					// 	if (envelope.params.getAll) {
-					// 		//this should really get all pages until done
-					// 		//instead of hardcoding a ridicously large page size
-					// 		pageSize = 16384;
-					// 	}
-					// 	host.auth.getActionList(pageSize)
-					// 		.then( null, function( err ) {
-					// 			console.log( err );
-					// 		} )
-					// 		.then( function ( list ) {
-					// 			envelope.reply( { data: list } );
-					// 		} );
-					// } else {
-					console.log( host );
-					envelope.reply( { data: host.actions } );
-					// }
+					if( host.auth && host.auth.getActionList ) {
+						var pageSize = 20;
+						if (envelope.params.getAll) {
+							//this should really get all pages until done
+							//instead of hardcoding a ridicously large page size
+							pageSize = 16384;
+						}
+						host.auth.getActionList(pageSize)
+							.then( null, function( err ) {
+								console.log( err );
+							} )
+							.then( function ( list ) {
+								envelope.reply( { data: _.groupBy( list, function( x ) { return x.resource; } ) } );
+							} );
+					} else {
+						envelope.reply( { data: host.actions } );
+					}
 				}
 			},
 			{
@@ -68,8 +67,8 @@ module.exports = function( host, fount ) {
 				topic: 'user.list',
 				path: 'user',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.getUserList ) {
-						host.auth.authorizer.getUserList( 100 )
+					if( host.auth && host.auth.getUserList ) {
+						host.auth.getUserList( 100 )
 							.then( null, function( err ) {
 								envelope.reply( { data: err, statusCode: 500 } );
 							} )
@@ -90,8 +89,8 @@ module.exports = function( host, fount ) {
 				topic: 'role.list',
 				path: 'role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.getRoleList ) {
-						host.auth.authorizer.getRoleList( 100 )
+					if( host.auth && host.auth.getRoleList ) {
+						host.auth.getRoleList( 100 )
 							.then( null, function( err ) {
 								envelope.reply( { data: err, statusCode: 500 } );
 							} )
@@ -109,9 +108,9 @@ module.exports = function( host, fount ) {
 				topic: 'user.role.list',
 				path: 'user/:user/role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.getUserRoles ) {
+					if( host.auth && host.auth.getUserRoles ) {
 						var user = envelope.data.user;
-						host.auth.authorizer.getUserRoles( user )
+						host.auth.getUserRoles( user )
 						 	.then( null, function( err ) {
 								envelope.reply( { data: err, statusCode: 500 } );
 							} )
@@ -129,9 +128,9 @@ module.exports = function( host, fount ) {
 				topic: 'action.role.list',
 				path: 'action/:action/role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.getRolesFor ) {
+					if( host.auth && host.auth.getRolesFor ) {
 						var action = envelope.data.action;
-						host.auth.authorizer.getRolesFor( action )
+						host.auth.getRolesFor( action )
 							.then( null, function( err ) {
 								envelope.reply( { data: err, statusCode: 500 } );
 							} )
@@ -149,10 +148,10 @@ module.exports = function( host, fount ) {
 				topic: 'set.action.roles',
 				path: 'action/:action/role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.setActionRoles ) {
+					if( host.auth && host.auth.setActionRoles ) {
 						var action = envelope.data.action;
 						var roles = envelope.data.roles;
-						host.auth.authorizer.setActionRoles( action, roles )
+						host.auth.setActionRoles( action, roles )
 							.then( null, function( err ) {
 								envelope.reply( { data: { error: err }, statusCode: 500 } );
 							} )
@@ -170,10 +169,10 @@ module.exports = function( host, fount ) {
 				topic: 'add.action.roles',
 				path: 'action/:action/role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.addActionRoles ) {
+					if( host.auth && host.auth.addActionRoles ) {
 						var action = envelope.data.action;
 						var roles = envelope.data.roles;
-						host.auth.authorizer.addActionRoles( action, roles )
+						host.auth.addActionRoles( action, roles )
 							.then( null, function( err ) {
 								envelope.reply( { data: { error: err }, statusCode: 500 } );
 							} )
@@ -191,10 +190,10 @@ module.exports = function( host, fount ) {
 				topic: 'remove.action.roles',
 				path: 'action/:action/role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.removeActionRoles ) {
+					if( host.auth && host.auth.removeActionRoles ) {
 						var action = envelope.data.action;
 						var roles = envelope.data.roles;
-						host.auth.authorizer.removeActionRoles( action, roles )
+						host.auth.removeActionRoles( action, roles )
 							.then( null, function( err ) {
 								envelope.reply( { data: { error: err }, statusCode: 500 } );
 							} )
@@ -212,10 +211,10 @@ module.exports = function( host, fount ) {
 				topic: 'set.user.roles',
 				path: 'user/:user/role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.setUserRoles ) {
+					if( host.auth && host.auth.setUserRoles ) {
 						var user = envelope.data.user;
 						var roles = envelope.data.roles;
-						host.auth.authorizer.setUserRoles( user, roles )
+						host.auth.setUserRoles( user, roles )
 							.then( null, function( err ) {
 								envelope.reply( { data: { error: err }, statusCode: 500 } );
 							} )
@@ -233,10 +232,10 @@ module.exports = function( host, fount ) {
 				topic: 'add.user.roles',
 				path: 'user/:user/role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.addUserRoles ) {
+					if( host.auth && host.auth.addUserRoles ) {
 						var user = envelope.data.user;
 						var roles = envelope.data.roles;
-						host.auth.authorizer.addUserRoles( user, roles )
+						host.auth.addUserRoles( user, roles )
 							.then( null, function( err ) {
 								envelope.reply( { data: { error: err }, statusCode: 500 } );
 							} )
@@ -254,10 +253,10 @@ module.exports = function( host, fount ) {
 				topic: 'remove.user.roles',
 				path: 'user/:user/role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.removeUserRoles ) {
+					if( host.auth && host.auth.removeUserRoles ) {
 						var user = envelope.data.user;
 						var roles = envelope.data.roles;
-						host.auth.authorizer.removeUserRoles( user, roles )
+						host.auth.removeUserRoles( user, roles )
 							.then( null, function( err ) {
 								envelope.reply( { data: { error: err }, statusCode: 500 } );
 							} )
@@ -275,9 +274,9 @@ module.exports = function( host, fount ) {
 				topic: 'add.role',
 				path: 'role/:role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.addRole ) {
+					if( host.auth && host.auth.addRole ) {
 						var role = envelope.data.role;
-						host.auth.authorizer.addRole( role )
+						host.auth.addRole( role )
 							.then( null, function( err ) {
 								envelope.reply( { data: { error: err }, statusCode: 500 } );
 							} )
@@ -295,9 +294,9 @@ module.exports = function( host, fount ) {
 				topic: 'remove.role',
 				path: 'role/:role',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authorizer.removeRole ) {
+					if( host.auth && host.auth.removeRole ) {
 						var role = envelope.data.role;
-						host.auth.authorizer.removeRole( role )
+						host.auth.removeRole( role )
 							.then( null, function( err ) {
 								envelope.reply( { data: { error: err }, statusCode: 500 } );
 							} )
@@ -315,10 +314,10 @@ module.exports = function( host, fount ) {
 				'topic': 'create.user',
 				'path': 'user/:userName',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authenticator.create ) {
+					if( host.auth && host.auth.createUser ) {
 						var user = envelope.data.userName,
 							pass = envelope.data.password;
-						host.auth.authenticator.create( user, pass )
+						host.auth.createUser( user, pass )
 							.then( null, function( err ) {
 								envelope.reply( { data: { result: 'Could not create user "' + user + '"', error: err }, statusCode: 500 } );
 							} )
@@ -336,9 +335,9 @@ module.exports = function( host, fount ) {
 				'topic': 'enable.user',
 				'path': 'user/:userName',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authenticator.enable ) {
+					if( host.auth && host.auth.enableUser ) {
 						var user = envelope.data.userName;
-						host.auth.authenticator.enable( user )
+						host.auth.enableUser( user )
 							.then( null, function( err ) {
 								envelope.reply( { data: 'Could not enable user "' + user + '"', statusCode: 500 } );
 							} )
@@ -356,9 +355,9 @@ module.exports = function( host, fount ) {
 				'topic': 'disable.user',
 				'path': 'user/:userName',
 				handle: function( envelope ) {
-					if( host.auth && host.auth.authenticator.disable ) {
+					if( host.auth && host.auth.disableUser ) {
 						var user = envelope.data.userName;
-						host.auth.authenticator.disable( user )
+						host.auth.disableUser( user )
 							.then( null, function( err ) {
 								envelope.reply( { data: 'Could not disable user "' + user + '"', statusCode: 500 } );
 							} )

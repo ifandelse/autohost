@@ -1,8 +1,7 @@
 var should = require( 'should' ),
 	path = require( 'path' ),
 	_ = require( 'lodash' ),
-	requestor = require( 'request' ).defaults( { jar: true } ),
-	io = require( 'socket.io-client' ),
+	requestor = require( 'request' ).defaults( { jar: false } ),
 	metrics = require( 'cluster-metrics' ),
 	when = require( 'when' ),
 	port = 88988,
@@ -11,22 +10,10 @@ var should = require( 'should' ),
 		socketio: true,
 		websocket: true
 	},
-	authProvider = {
-		authorizer: {
-			checkPermission: function() {}
-		},
-		getSocketAuth: function( onSuccess ) {
-			return {
-				authenticate: function() {
-					onSuccess( 'test', 'test' );
-				}
-			};
-		},
-		getSocketRoles: function() {
-			return when( [] );
-		}
-	},
-	http = require( '../../src/http/http.js' )( config, requestor, authProvider, metrics ),
+	authProvider = require( '../auth/mock.js' )( config ),
+	passport = require( '../../src/http/passport.js' )( config, authProvider, metrics ),
+	middleware = require( '../../src/http/middleware.js' )( config, metrics ),
+	http = require( '../../src/http/http.js' )( config, requestor, passport, middleware, metrics ),
 	socket = require( '../../src/websocket/socket.js' )( config, http );
 
 describe( 'with socketio', function() {
@@ -34,7 +21,11 @@ describe( 'with socketio', function() {
 
 	before( function( done ) {
 		http.start();
-		socket.start( authProvider );
+		socket.start( passport );
+
+		authProvider.users = {};
+		passport.resetUserCheck();
+		var io = require( 'socket.io-client' );
 		client = io( 'http://localhost:88988' );
 		client.once( 'connect', function() {
 			done();
@@ -53,7 +44,7 @@ describe( 'with socketio', function() {
 				}
 			} );
 
-			client.on( 'server.message', function( msg ) {
+			client.once( 'server.message', function( msg ) {
 				fromServer = msg;
 				done();
 			} );
@@ -76,5 +67,7 @@ describe( 'with socketio', function() {
 	after( function() {
 		socket.stop();
 		http.stop();
+		delete require.cache[ require.resolve( 'socket.io-client' ) ];
+		delete require.cache[ require.resolve( './noauth.spec.js' ) ];
 	} );
 } );
