@@ -26,10 +26,25 @@ describe( 'with failed socket.io credentials', function() {
 		http.start();
 		socket.start( passport );
 		var io = require( 'socket.io-client' );
-		client = io( 'http://localhost:88988' );
+		client = io( 'http://localhost:88988', { query: 'token=blorp' } );
 		client.once( 'connect_error', function( data ) {
 			socketErr = data;
 			done();
+		} );
+
+		var events = [ 
+			'connect',
+			'connect_error',
+			'connect_timeout',
+			'reconnect',
+			'reconnect_attempt',
+			'reconnecting',
+			'reconnect_error',
+			'reconnect_failed'
+		];
+
+		_.each( events, function( ev ) {
+			client.on( ev, function( d ) { console.log( ev, 'JUST. HAPPENED.', d ); } );
 		} );
 	} );
 
@@ -42,8 +57,10 @@ describe( 'with failed socket.io credentials', function() {
 	} );
 
 	after( function() {
+		client.io.close();
+		client.removeAllListeners();
+		console.log( client.io );
 		socket.stop();
 		http.stop();
-		delete require.cache[ require.resolve( 'socket.io-client' ) ];
 	} );
 } );

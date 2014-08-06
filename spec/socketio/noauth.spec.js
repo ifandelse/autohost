@@ -16,19 +16,37 @@ var should = require( 'should' ),
 	http = require( '../../src/http/http.js' )( config, requestor, passport, middleware, metrics ),
 	socket = require( '../../src/websocket/socket.js' )( config, http );
 
-describe( 'with socketio', function() {
+describe( 'with socketio and no users', function() {
 	var client;
 
 	before( function( done ) {
 		http.start();
 		socket.start( passport );
-
+		var onConnect = function() {
+			onConnect = function() {};
+			done();
+		};
 		authProvider.users = {};
 		passport.resetUserCheck();
-		var io = require( 'socket.io-client' );
-		client = io( 'http://localhost:88988' );
-		client.once( 'connect', function() {
-			done();
+		var io = require( 'socket.io-client', {} );
+		client = io( 'http://localhost:88988', { query: 'token=blorp' } );
+		client.once( 'connect', onConnect );
+		client.once( 'reconnect', onConnect );
+		client.io.open();
+
+		var events = [ 
+			'connect',
+			'connect_error',
+			'connect_timeout',
+			'reconnect',
+			'reconnect_attempt',
+			'reconnecting',
+			'reconnect_error',
+			'reconnect_failed'
+		];
+
+		_.each( events, function( ev ) {
+			client.on( ev, function( d ) { console.log( ev, 'JUST. HAPPENED.', d ); } );
 		} );
 	} );
 
@@ -38,6 +56,7 @@ describe( 'with socketio', function() {
 
 		before( function( done ) {
 			socket.on( 'client.message', function( msg, client ) {
+				console.log( 'CLIENT MESSAGE' );
 				if( msg.txt === 'ohhai' ) {
 					fromClient = msg;
 					client.publish( msg.replyTo, { txt: 'hulloo!' } );
@@ -65,9 +84,9 @@ describe( 'with socketio', function() {
 	} );
 
 	after( function() {
+		client.io.close();
+		client.removeAllListeners();
 		socket.stop();
 		http.stop();
-		delete require.cache[ require.resolve( 'socket.io-client' ) ];
-		delete require.cache[ require.resolve( './noauth.spec.js' ) ];
 	} );
 } );

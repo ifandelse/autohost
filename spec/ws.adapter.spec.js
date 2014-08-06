@@ -36,10 +36,6 @@ describe( 'with socket adapter', function() {
 		};
 
 	before( function( done ) {
-		delete require.cache[ require.resolve( './socketio/invalid-auth.spec.js' ) ];
-		delete require.cache[ require.resolve( './socketio/noauth.spec.js' ) ];
-		delete require.cache[ require.resolve( 'socket.io-client' ) ];
-
 		authProvider.tokens = { 'blorp': 'userman' };
 		authProvider.users = { 
 			'userman': { name: 'userman', password: 'hi', roles: [] },
@@ -48,7 +44,6 @@ describe( 'with socket adapter', function() {
 		
 		var connected = 0,
 			check = function() {
-				console.log( '*** ONE SOCKET CONNECTION ***' );
 				if( ++connected > 1 ) {
 					done();
 				}
@@ -74,9 +69,26 @@ describe( 'with socket adapter', function() {
 		http.start();
 		socket.start( passport );
 		ioClient = io( 'http://localhost:88988', { query: 'token=blorp' } );
-		ioClient.io.open( function() { console.log( 'HAY' ); } );
-		ioClient.io.reconnect();
+		// ioClient.io.open( function() { console.log( 'HAY' ); } );
+		// ioClient.io.reconnect();
+		ioClient.once( 'reconnect', check );
 		ioClient.once( 'connect', check );
+		ioClient.io.open();
+
+		var events = [ 
+			'connect',
+			'connect_error',
+			'connect_timeout',
+			'reconnect',
+			'reconnect_attempt',
+			'reconnecting',
+			'reconnect_error',
+			'reconnect_failed'
+		];
+
+		_.each( events, function( ev ) {
+			ioClient.on( ev, function( d ) { console.log( '!!!!!!!!!!!!!!!!!!!!!!!!!!', ev, 'JUST. HAPPENED.', d ); } );
+		} );
 
 		wsClient = new WebSocketClient();
 		wsClient.connect(
@@ -186,6 +198,7 @@ describe( 'with socket adapter', function() {
 	} );
 
 	after( function() {
+		ioClient.removeAllListeners();
 		socket.stop();
 		http.stop();
 	} );
