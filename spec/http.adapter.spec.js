@@ -29,12 +29,6 @@ describe( 'with http adapter', function() {
 	before( function() {
 		authProvider.tokens = { 'blorp': 'userman' };
 		authProvider.users = { 'userman': { name: 'userman', password: 'hi', roles: [] } };
-		http.middleware( '/', function( req, res, next ) {
-			req.user = {
-				roles: userRoles
-			};
-			next();
-		} );
 		httpAdapter.action( { name: 'test' }, {
 			alias: 'call',
 			verb: 'get',
@@ -89,7 +83,7 @@ describe( 'with http adapter', function() {
 			} );
 		} );
 
-		it( 'should return file contents', function() {
+		it( 'should return action response', function() {
 			result.should.equal( 'ta-da!' );
 		} );
 

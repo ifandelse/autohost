@@ -9,15 +9,7 @@ var bodyParser = require( 'body-parser' ),
 
 function applyMiddelware( attach ) {
 	// add a timer to track ALL requests
-	attach( '/', function( req, res, next ) {
-		req.context = {};
-		var timerKey = [ req.method.toUpperCase(), req.url, 'timer' ].join( ' ' );
-		metrics.timer( timerKey ).start();
-		res.on( 'finish', function() { 
-			metrics.timer( timerKey ).record();
-		} );
-		next();
-	} );
+	attach( '/', requestMetrics );
 
 	// turn on cookies unless turned off by the consumer
 	if( !config.noCookies ) {
@@ -41,12 +33,24 @@ function applyMiddelware( attach ) {
 
 	// turn on cross origin unless turned off by the consumer
 	if( !config.noCrossOrigin ) {
-		attach( '/', function( req, res, next ) {
-			res.header( 'Access-Control-Allow-Origin', '*' );
-			res.header( 'Access-Control-Allow-Headers', 'X-Requested-With' );
-			next();
-		} );
+		attach( '/', crossOrigin );
 	}
+}
+
+function crossOrigin( req, res, next ) {
+	res.header( 'Access-Control-Allow-Origin', '*' );
+	res.header( 'Access-Control-Allow-Headers', 'X-Requested-With' );
+	next();
+}
+
+function requestMetrics( req, res, next ) {
+	req.context = {};
+	var timerKey = [ req.method.toUpperCase(), req.url, 'timer' ].join( ' ' );
+	metrics.timer( timerKey ).start();
+	res.on( 'finish', function() { 
+		metrics.timer( timerKey ).record();
+	} );
+	next();
 }
 
 module.exports = function( cfg, meter ) {

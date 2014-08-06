@@ -3,7 +3,7 @@ var should = require( 'should' ),
 	_ = require( 'lodash' ),
 	when = require( 'when' ),
 	requestor = require( 'request' ).defaults( { jar: false } ),
-	
+	debug = require( 'debug' )( 'autohost-spec:ws.adapter' ),
 	metrics = require( 'cluster-metrics' ),
 	port = 88988,
 	config = {
@@ -62,15 +62,12 @@ describe( 'with socket adapter', function() {
 			verb: 'get',
 			topic: 'call',
 			handle: function( env ) {
-				console.log( 'recieved', env.data.msg );
 				env.reply( { data: { youSed: env.data.msg } } );
 			}
 		}, { topics: {} } );
 		http.start();
 		socket.start( passport );
 		ioClient = io( 'http://localhost:88988', { query: 'token=blorp' } );
-		// ioClient.io.open( function() { console.log( 'HAY' ); } );
-		// ioClient.io.reconnect();
 		ioClient.once( 'reconnect', check );
 		ioClient.once( 'connect', check );
 		ioClient.io.open();
@@ -87,7 +84,7 @@ describe( 'with socket adapter', function() {
 		];
 
 		_.each( events, function( ev ) {
-			ioClient.on( ev, function( d ) { console.log( '!!!!!!!!!!!!!!!!!!!!!!!!!!', ev, 'JUST. HAPPENED.', d ); } );
+			ioClient.on( ev, function( d ) { debug( '%s JUST. HAPPENED. %s', ev, d ); } );
 		} );
 
 		wsClient = new WebSocketClient();

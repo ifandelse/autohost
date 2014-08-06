@@ -1,5 +1,6 @@
 var path = require( 'path' ),
 	_ = require( 'lodash' ),
+	debug = require( 'debug' )( 'autohost:http-adapter' ),
 	HttpEnvelope,
 	http,
 	config, 
@@ -52,10 +53,11 @@ function buildPath( pathSpec ) {
 }
 
 function checkPermissionFor( user, action ) {
+	debug( 'Checking %s\'s permissions for %s', ( user ? user.name : 'nouser' ), action );
 	return authStrategy.checkPermission( user, action )
 		.then( null, function( err ) {
-			console.log( 'checking permissions caused an error', err.stack );
-			return true;
+			debug( 'Error during check permissions: %s', err.stack );
+			return false;
 		} )
 		.then( function( granted ) {
 			return granted;
@@ -83,6 +85,7 @@ function wireupAction( resource, action, meta ) {
 	var url = buildActionUrl( resource.name, action ),
 		alias = buildActionAlias( resource.name, action );
 	meta.routes[ action.alias ] = { verb: action.verb, url: url };
+	debug( 'Mapping resource \'%s\' action \'%s\' to %s %s', resource.name, action.alias, action.verb, url );
 	http.route( url, action.verb, function( req, res ) {
 		var respond = function() {
 			var envelope = new HttpEnvelope( req, res );
@@ -92,8 +95,10 @@ function wireupAction( resource, action, meta ) {
 			checkPermissionFor( req.user, alias )
 				.then( function( pass ) {
 					if( pass ) {
+						debug( 'HTTP activation of action %s (%s %s) for %s granted', alias, action.verb, url, req.user.name );
 						respond();
 					} else {
+						debug( 'User %s was denied HTTP activation of action %s (%s %s)', req.user.name, alias, action.verb, url );
 						res.status( 403 ).send( "User lacks sufficient permissions" );
 					}
 				} );

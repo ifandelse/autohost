@@ -1,6 +1,7 @@
 var _ = require( 'lodash' ),
 	socketio = require( 'socket.io' ),
 	passportIo = require( 'passport.socketio' ),
+	debug = require( 'debug' )( 'autohost:socketio' ),
 	authStrategy,
 	registry,
 	config,
@@ -27,7 +28,7 @@ function acceptSocket( socket ) {
 
 	// attach roles to user on socket
 	if( authStrategy ) {
-		authStrategy.getSocketRoles( socket.user )
+		authStrategy.getSocketRoles( socket.user.name )
 			.then( function( roles ) {
 				socket.user.roles = roles;
 			} );

@@ -7,6 +7,7 @@ var _ = require( 'lodash' ),
 	Basic = require( 'passport-http' ).BasicStrategy,
 	Bearer = require( 'passport-http-bearer' ).Strategy,
 	Query = require( './queryStrategy.js' ),
+	debug = require( 'debug' )( 'autohost:auth.mock' ),
 	bearerAuth,
 	basicAuth,
 	queryAuth,
@@ -34,8 +35,7 @@ function authenticate( req, res, next ) {
 		basicAuth( req, res, next );
 	}
 	else if( req._query && req._query[ 'token' ] ) {
-		console.log( 'authing a req', req._query[ 'token' ] );
-		try{ queryAuth( req, res, next ); } catch( e ) { console.log( e.stack ); }
+		queryAuth( req, res, next );
 	} else {
 		bearerAuth( req, res, next );
 	}
@@ -45,35 +45,33 @@ function authenticateCredentials( userName, password, done ) {
 	var user = _.where( wrapper.users, function( o, u ) {
 		return u === userName && o.password === password;
 	} );
-	console.log( '-- creds found', user, 'amongst', wrapper.users );
+	debug( 'credentials %s:%s resulted in', userName, password, user ,'amongst', _.keys( wrapper.users ) );
 	done( null, ( user.length ? user[ 0 ] : user ) || false );
 }
 
 function authenticateToken( token, done ) {
 	var userName = wrapper.tokens[ token ],
 		user = userName ? wrapper.users[ userName ] : false;
-	console.log( '-- token found', user, 'amongst', wrapper.users );
+	debug( 'bearer token %s resulted in', token, user ,'amongst', _.keys( wrapper.users ) );
 	done( null, user );
 }
 
 function authenticateQuery( token, done ) {
 	var userName = wrapper.tokens[ token ],
 		user = userName ? wrapper.users[ userName ] : false;
-	console.log( '-- query found', user, 'amongst', wrapper.users );
+	debug( 'query token %s resulted in', token, user ,'amongst', _.keys( wrapper.users ) );
 	done( null, user );
 }
 
 function checkPermission( user, action ) {
-	try {
 	var userName = user.name ? user.name : user,
 		userRoles = user.roles ? user.roles : getUserRoles( userName );
-	console.log( 'check user', userName, 'for', action );
+	debug( 'checking user %s for action %s', userName, action );
 	return when.try( hasPermissions, userRoles, getActionRoles( action ) );
-	} catch( e ) { console.log( 'WELL FUKKABUKIT', e.stack ); }
 }
 
 function hasPermissions( userRoles, actionRoles ) {
-	console.log( 'user roles', userRoles, 'action roles', actionRoles );
+	debug( 'user roles: %s, action roles: %s', userRoles, actionRoles );
 	return _.isEmpty( actionRoles ) || 
 		( _.intersection( userRoles, actionRoles ).length > 0 );
 }

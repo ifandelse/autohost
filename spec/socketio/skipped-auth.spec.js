@@ -3,6 +3,7 @@ var should = require( 'should' ),
 	_ = require( 'lodash' ),
 	requestor = require( 'request' ).defaults( { jar: false } ),
 	metrics = require( 'cluster-metrics' ),
+	debug = require( 'debug' )( 'autohost-spec:skipped-auth' ),
 	when = require( 'when' ),
 	port = 88988,
 	config = {
@@ -46,7 +47,7 @@ describe( 'with socketio and no users', function() {
 		];
 
 		_.each( events, function( ev ) {
-			client.on( ev, function( d ) { console.log( ev, 'JUST. HAPPENED.', d ); } );
+			client.on( ev, function( d ) { debug( '%s JUST. HAPPENED. %s', ev, d ); } );
 		} );
 	} );
 
@@ -56,7 +57,6 @@ describe( 'with socketio and no users', function() {
 
 		before( function( done ) {
 			socket.on( 'client.message', function( msg, client ) {
-				console.log( 'CLIENT MESSAGE' );
 				if( msg.txt === 'ohhai' ) {
 					fromClient = msg;
 					client.publish( msg.replyTo, { txt: 'hulloo!' } );

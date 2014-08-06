@@ -1,6 +1,7 @@
 var _ = require( 'lodash' ),
 	when = require( 'when' ),
 	passport = require( 'passport' ),
+	debug = require( 'debug' )( 'autohost:passport' ),
 	noOp = function() { return when( true ); },
 	serializer = function( user, done ) { done( null, user ); },
 	deserializer = function( user, done ) { done( null, user ); },
@@ -33,6 +34,7 @@ function addPassport( http ) {
 
 	passport.serializeUser( authProvider.serializeUser );
 	passport.deserializeUser( authProvider.deserializeUser );
+	debug( 'passport configured' );
 }
 
 function getAuthMiddleware( uri ) {
@@ -55,29 +57,39 @@ function checkPermission( user, action ) {
 
 function getRoles( req, res, next ) {
 	metrics.timer( authorizationTimer ).start();
+	var userName = _.isObject( req.user.name ) ? req.user.name.name : req.user.name;
 	authProvider.getUserRoles( req.user.name )
 		.then( null, function( err ) {
 			metrics.counter( authorizationErrorCount ).incr();
 			metrics.meter( authorizationErrorRate ).record();
-			metrics.timer( authorizationTimer ).start();
+			metrics.timer( authorizationTimer ).record();
+			debug( 'Failed to get roles for %s with %s', userName, err.stack );
 			res.status( 500 ).send( 'Could not determine user permissions' );
 		} )
 		.then( function( roles ) {
+			debug( 'Got roles [ %s ] for %s', roles, req.user.name );
 			req.user.roles = roles;
+			metrics.timer( authorizationTimer ).record();
 			next();
 		} );
 }
 
 function getSocketRoles( userName ) {
+	if( typeof userName == 'object' ) {
+		console.trace( userName );
+	}
 	metrics.timer( authorizationTimer ).start();
 	return authProvider.getUserRoles( userName )
 		.then( null, function( err ) {
 			metrics.counter( authorizationErrorCount ).incr();
 			metrics.meter( authorizationErrorRate ).record();
-			metrics.timer( authorizationTimer ).start();
+			metrics.timer( authorizationTimer ).record();
+			debug( 'Failed to get roles for %s with %s', userName, err.stack );
 			return [];
 		} )
 		.then( function( roles ) {
+			debug( 'Got roles [ %s ] for %s', roles, userName );
+			metrics.timer( authorizationTimer ).record();
 			return roles;
 		} );
 }
@@ -93,6 +105,7 @@ function skipAuthentication( req, res, next ) {
 		name: 'anonymous',
 		roles: []
 	}
+	debug( 'Skipping authentication and assigning user anonymous to request %s %s', req.method, req.url );
 	next();
 }
 

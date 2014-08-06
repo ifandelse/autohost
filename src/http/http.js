@@ -4,17 +4,18 @@ var path = require( 'path' ),
 	qs = require( 'qs' ),
 	express = require( 'express' ),
 	http = require( 'http' ),
+	debug = require( 'debug' )( 'autohost:http-transport' ),
 	Router = express.Router,
 	expreq = express.request,
 	expres = express.response,
 	queryparse = qs.parse,
+	middleware = [],
+	routes = [],
+	paths = [],
 	request, 
 	config, 
 	metrics,
-	middlewareLib,
-	middleware = [],
-	routes = []
-	paths = [];
+	middlewareLib;
 
 var wrapper = {
 	getMiddleware: createMiddlewareStack,
@@ -48,13 +49,12 @@ function createAuthMiddlewareStack() {
 	return router;
 }
 
+// adaptation of express's initializing middleware
+// the original approach breaks engine-io
 function expressInit( req, res, next ) {
-    // req.res = res;
-    // res.req = req;
     req.next = next;
     req.__proto__ = expreq;
     res.__proto__ = expres;
-    // res.locals = res.locals || Object.create(null);
     next();
 }
 
@@ -68,9 +68,7 @@ function initialize( authStrategy ) {
 	// prime middleware with defaults
 	middlewareLib.attach( registerMiddleware );
 
-	// if( authStrategy ) {
 	wrapper.passport.wireupPassport( wrapper );
-	//}
 
 	// apply user-supplied middleware
 	_.each( middleware, function( m ) { m( wrapper.app ); } );
@@ -78,6 +76,8 @@ function initialize( authStrategy ) {
 	_.each( paths, function( p ) { p(); } );
 }
 
+// Internal query-parsing middleware from express
+// (not exposed, so copied here)
 function queryParser( req, res, next ) {
 	if ( !req.query ) {
 		var val = parseUrl( req ).query;
@@ -88,6 +88,7 @@ function queryParser( req, res, next ) {
 
 function registerMiddleware( filter, callback ) {
 	middleware.push( function( target ) {
+		debug( 'MIDDLEWARE: %s mounted at %s', ( callback.name || 'anonymous' ), filter );
 		target.use( filter, callback );
 	} );
 }
@@ -97,12 +98,13 @@ function registerRoute( url, verb, callback ) {
 	verb = verb == 'all' || verb == 'any' ? 'all' : verb;
 	var errors = [ url, verb, 'errors' ].join( '.' );
 	routes.push( function() {
+		debug( 'ROUTE: %s %s -> %s', verb, url, ( callback.name || 'anonymous' ) );
 		wrapper.app[ verb ]( url, function( req, res ) {
 			try {
 				callback( req, res );
 			} catch ( err ) {
 				metrics.meter( errors ).record();
-				console.log( 'error on route, "' + url + '" verb "' + verb + '"', err.stack );
+				debug( 'ERROR! route: %s %s failed with %s', verb, url, err.stack );
 			}
 		} );
 	} );
@@ -110,7 +112,9 @@ function registerRoute( url, verb, callback ) {
 
 function registerStaticPath( url, filePath ) {
 	paths.push( function() {
-		wrapper.app.use( url, express[ 'static' ]( path.resolve( filePath ) ) );
+		var target = path.resolve( filePath );
+		debug( 'STATIC: %s -> %s', url, target );
+		wrapper.app.use( url, express[ 'static' ]( target ) );
 	} );
 }
 
@@ -124,6 +128,9 @@ function start( authStrategy ) {
 function stop() {
 	wrapper.app._router = undefined;
 	wrapper.server.close();
+	routes = [];
+	paths = [];
+	middleware = [];
 }
 
 module.exports = function( cfg, req, pass, mw, metric ) {

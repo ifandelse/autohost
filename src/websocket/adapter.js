@@ -1,5 +1,6 @@
 var path = require( 'path' ),
 	_ = require( 'lodash' ),
+	debug = require( 'debug' )( 'autohost:websocket-adapter' ),
 	config,
 	authStrategy,
 	socket,
@@ -21,9 +22,11 @@ function buildActionTopic( resourceName, action ) {
 }
 
 function checkPermissionFor( user, action ) {
+	debug( 'Checking %s\'s permissions for %s', ( user ? user.name : 'nouser' ), action );
 	return authStrategy.checkPermission( user.name, action )
 		.then( null, function() {
-			return true;
+			debug( 'Error during check permissions: %s', err.stack );
+			return false;
 		} )
 		.then( function( granted ) {
 			return granted;
@@ -47,6 +50,7 @@ function wireupAction( resource, action, meta ) {
 		alias = buildActionAlias( resource.name, action );
 
 	meta.topics[ action.alias ] = { topic: topic };
+	debug( 'Mapping resource \'%s\' action \'%s\' to topic %s', resource.name, action.alias, alias );
 	socket.on( topic, function( message, socket ) {
 		var data = message.data || message;
 		var respond = function() {
@@ -57,8 +61,10 @@ function wireupAction( resource, action, meta ) {
 			checkPermissionFor( socket.user, alias )
 				.then( function( pass ) {
 					if( pass ) {
+						debug( 'WS activation of action %s for %s granted', alias, socket.user.name );
 						respond();
 					} else {
+						debug( 'User %s was denied WS activation of action %s', socket.user.name, alias );
 						socket.publish( data.replyTo || topic, 'User lacks sufficient permission' );
 					}
 				} );

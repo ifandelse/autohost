@@ -1,6 +1,7 @@
 var _ = require( 'lodash' ),
 	WS = require ( 'websocket' ).server,
 	ServerResponse = require( 'http' ).ServerResponse,
+	debug = require( 'debug' )( 'autohost:websocket' ),
 	authStrategy,
 	registry,
 	socketServer,
@@ -26,7 +27,7 @@ function acceptSocketRequest( request ) {
 
 	// attach roles to user on socket
 	if( authStrategy ) {
-		authStrategy.getSocketRoles( socket.user )
+		authStrategy.getSocketRoles( socket.user.name )
 			.then( function( roles ) {
 				socket.user.roles = roles;
 			} );

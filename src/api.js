@@ -4,6 +4,7 @@ var _ = require( 'lodash' ),
 	nodeWhen = require( 'when/node' ),
 	fs = require( 'fs' ),
 	gaze = require( 'gaze' ),
+	debug = require( 'debug' )( 'autohost:api' ),
 	readDirectory = nodeWhen.lift( fs.readdir ),
 	wrapper = {
 		actionList: {},
@@ -56,11 +57,11 @@ function loadModule( resourcePath ) {
 		if( mod && mod.name ) {
 			return processResource( mod, path.dirname( resourcePath ) );
 		} else {
-			console.log( 'Skipping resource at', resourcePath, 'no valid metadata provided' );
+			debug( 'Skipping resource at %s - no valid metadata provided', resourcePath );
 			return when( [] );
 		}
 	} catch (err) {
-		console.log( 'Error loading resource module at', resourcePath, 'with', err.stack );
+		debug( 'Error loading resource module at %s with: %s', resourcePath, err.stack );
 		return when( [] );
 	}
 }
@@ -138,7 +139,7 @@ function watch( filePath ) {
 		return;
 	return gaze( path.join( filePath, '**/resource.js' ), function( err, watcher ) {
 		this.on( 'changed', function( changed ) {
-			console.log( 'Reloading changed resource', path.basename( path.dirname( changed ) ) );
+			debug( 'Reloading changed resource from %s', path.basename( path.dirname( changed ) ) );
 			loadModule( changed );
 		} );
 	} );

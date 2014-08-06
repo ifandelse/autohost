@@ -1,4 +1,5 @@
 var _ = require( 'lodash' ),
+	debug = require( 'debug' )( 'autohost:ws-transport' ),
 	clients = [],
 	config, socketIO, websocket, http,
 	wrapper = {
@@ -25,12 +26,14 @@ function socketIdentified( id, socket ) {
 }
 
 function notifyClients( message, data ) {
+	debug( 'Notifying %d clients: %s %s', wrapper.clients.length, message, JSON.stringify( data ) );
 	_.each( wrapper.clients, function( client ) {
 		client.publish( message, data );
 	} );
 }
 
 function onTopic( topic, handle ) {
+	debug( 'TOPIC: %s -> %s', topic, ( handle.name || 'anonymous' ) );
 	wrapper.topics[ topic ] = handle;
 	if( socketIO ) {
 		socketIO.on( topic, handle );
@@ -48,6 +51,7 @@ function removeClient( socket ) {
 }
 
 function sendToClient( id, message, data ) {
+	debug( 'Sending to clients %s: %s %s', id, message, JSON.stringify( data ) );
 	var socket = wrapper.clients.lookup[ id ];
 	if( !socket ) {
 		socket = wrapper.clients.find( clients, function( client ) {

@@ -19,7 +19,7 @@ var should = require( 'should' ),
 
 authProvider.users[ 'test' ] = { user: 'torpald' };
 
-describe( 'with bad websocket credentials', function() {
+describe( 'with websocket and bad credentials', function() {
 	var socketErr,
 		client;
 

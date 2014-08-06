@@ -2,6 +2,7 @@ var should = require( 'should' ),
 	path = require( 'path' ),
 	_ = require( 'lodash' ),
 	requestor = require( 'request' ).defaults( { jar: false } ),
+	debug = require( 'debug' )( 'autohost-spec:invalid-auth' ),
 	metrics = require( 'cluster-metrics' ),
 	when = require( 'when' ),
 	port = 88988,
@@ -44,7 +45,7 @@ describe( 'with failed socket.io credentials', function() {
 		];
 
 		_.each( events, function( ev ) {
-			client.on( ev, function( d ) { console.log( ev, 'JUST. HAPPENED.', d ); } );
+			client.on( ev, function( d ) { debug( '%s JUST. HAPPENED. %s', ev, d ); } );
 		} );
 	} );
 
@@ -59,7 +60,6 @@ describe( 'with failed socket.io credentials', function() {
 	after( function() {
 		client.io.close();
 		client.removeAllListeners();
-		console.log( client.io );
 		socket.stop();
 		http.stop();
 	} );

@@ -19,7 +19,7 @@ var should = require( 'should' ),
 
 authProvider.users[ 'admin' ] = { name: 'admin', password: 'admin' };
 
-describe( 'with websocket', function() {
+describe( 'with websocket and valid credentials', function() {
 	var client,
 		clientSocket;
 
@@ -40,7 +40,7 @@ describe( 'with websocket', function() {
 		} );
 	} );
 
-	describe( 'when passing authentication', function() {
+	describe( 'when exchanging messages', function() {
 		var fromClient,
 			fromServer;
 
